@@ -6,6 +6,7 @@ use Dedoc\Scramble\Infer\Services\FileParser;
 use Dedoc\Scramble\Support\RouteInfo;
 use PhpParser\Node;
 use PhpParser\NodeFinder;
+use Spatie\QueryBuilder\AllowedSort;
 
 class InferHelper
 {
@@ -20,7 +21,13 @@ class InferHelper
 
         // ->allowedIncludes(['posts', 'posts.author'])
         if ($methodCall->args[0]->value instanceof Node\Expr\Array_) {
-            return array_map(fn (Node\Expr\ArrayItem $item) => $item->value->value, $methodCall->args[0]->value->items);
+            return array_map(function (Node\Expr\ArrayItem $item) {
+                if ($item->value instanceof Node\Expr\StaticCall) {
+                    return $this->inferValueFromStaticCall($item->value);
+                }
+
+                return $item->value->value;
+            }, $methodCall->args[0]->value->items);
         }
 
         // ->allowedIncludes('posts', 'posts.author')
@@ -125,9 +132,9 @@ class InferHelper
     public function inferValueFromStaticCall(Node\Expr\StaticCall $node)
     {
         switch ($node->class->name) {
-            case 'AllowedFilter':
+            case \Spatie\QueryBuilder\AllowedFilter::class:
                 return $this->inferValueFromAllowedFilter($node);
-            case 'AllowedSort':
+            case AllowedSort::class:
                 return $this->inferValueFromAllowedSort($node);
             default:
                 return self::NOT_SUPPORTED_KEY;
