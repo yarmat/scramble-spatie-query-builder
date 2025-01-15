@@ -18,7 +18,6 @@ class InferHelper
         if (count($methodCall->args) === 0) {
             return [];
         }
-
         // ->allowedIncludes(['posts', 'posts.author'])
         if ($methodCall->args[0]->value instanceof Node\Expr\Array_) {
             return array_map(function (Node\Expr\ArrayItem $item) {
@@ -44,7 +43,7 @@ class InferHelper
         if ($methodCall->args[0]->value instanceof Node\Expr\MethodCall) {
             return $this->inferValuesFromMethodCall($methodCall->args[0]->value, $routeInfo);
         }
-
+        
         return [];
     }
 

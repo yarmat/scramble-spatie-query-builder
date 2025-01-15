@@ -17,8 +17,6 @@ class AllowedSortsExtension extends OperationExtension
 
     const MethodName = 'allowedSorts';
 
-    public array $examples = ['title', '-title', 'title,-id'];
-
     public string $configKey = 'query-builder.parameters.sort';
 
     public function handle(Operation $operation, RouteInfo $routeInfo)
@@ -27,7 +25,7 @@ class AllowedSortsExtension extends OperationExtension
 
         $methodCall = Utils::findMethodCall($routeInfo, self::MethodName);
 
-        if (! $methodCall) {
+        if (!$methodCall) {
             return;
         }
 
@@ -35,18 +33,20 @@ class AllowedSortsExtension extends OperationExtension
         $arrayType = new ArrayType;
         $arrayType->items->enum(array_merge(
             $values,
-            array_map(fn ($value) => '-'.$value, $values)
+            array_map(fn($value) => '-' . $value, $values)
         ));
 
         $parameter = new Parameter(config($this->configKey), 'query');
 
-        $parameter->setSchema(Schema::fromType((new AnyOf)->setItems([
-            new StringType,
-            $arrayType,
-        ])))->example($this->examples);
+        $parameter
+            ->setSchema(Schema::fromType(new StringType()))
+            ->description('Available sorts: '
+                . implode(', ', array_map(fn($value) => '`' . $value . '`', $values))
+                . '. You can sort by multiple options by separating them with a comma. To sort in descending order, use - sign in front of the sort, for example: `-'
+                . $values[0] . '`.');
 
         $halt = $this->runHooks($operation, $parameter);
-        if (! $halt) {
+        if (!$halt) {
             $operation->addParameters([$parameter]);
         }
     }

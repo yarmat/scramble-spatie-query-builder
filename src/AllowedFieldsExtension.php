@@ -17,8 +17,6 @@ class AllowedFieldsExtension extends OperationExtension
 
     const MethodName = 'allowedFields';
 
-    public array $examples = ['id', 'title', 'posts.id'];
-
     public string $configKey = 'query-builder.parameters.fields';
 
     public function handle(Operation $operation, RouteInfo $routeInfo)
@@ -26,24 +24,68 @@ class AllowedFieldsExtension extends OperationExtension
         $helper = new InferHelper;
         $methodCall = Utils::findMethodCall($routeInfo, self::MethodName);
 
-        if (! $methodCall) {
+        if (!$methodCall) {
             return;
+        }
+
+
+        $values = $helper->inferValues($methodCall, $routeInfo);
+        $groupedValues = $this->groupByDots($values);
+
+        foreach ($groupedValues as $key => $value) {
+            if (is_array($value)) {
+                $parameter = new Parameter(config($this->configKey) . "[$key]", 'query');
+
+                $parameter
+                    ->setSchema(Schema::fromType(new StringType()))
+                    ->description('Available fields: '
+                        . implode(', ', array_map(fn($val) => '`' . $val . '`', $value))
+                        . '. You can include multiple options by separating them with a comma.');
+
+                $halt = $this->runHooks($operation, $parameter);
+                if (!$halt) {
+                    $operation->addParameters([$parameter]);
+                }
+            }
         }
 
         $parameter = new Parameter(config($this->configKey), 'query');
 
-        $values = $helper->inferValues($methodCall, $routeInfo);
-        $arrayType = new ArrayType;
-        $arrayType->items->enum($values);
+        $parameter
+            ->setSchema(Schema::fromType(new StringType()))
+            ->description('Available fields: '
+                . implode(', ', array_map(fn($value) => '`' . $value . '`', array_filter($groupedValues, fn($value) => is_string($value))))
+                . '. You can include multiple options by separating them with a comma.');
 
-        $parameter->setSchema(Schema::fromType((new AnyOf)->setItems([
-            $arrayType,
-            new StringType,
-        ])))->example($this->examples);
 
         $halt = $this->runHooks($operation, $parameter);
-        if (! $halt) {
+        if (!$halt) {
             $operation->addParameters([$parameter]);
         }
+    }
+
+    private function groupByDots(array $input): array
+    {
+        $result = [];
+
+        foreach ($input as $item) {
+            if (strpos($item, '.') === false) {
+                // Если точки нет, добавляем как есть
+                $result[] = $item;
+            } else {
+                // Находим последнее вхождение точки
+                $lastDotPos = strrpos($item, '.');
+                $mainKey = substr($item, 0, $lastDotPos); // Ключ до последней точки
+                $value = substr($item, $lastDotPos + 1); // Последний сегмент после точки
+
+                // Добавляем значение к ключу
+                if (!isset($result[$mainKey])) {
+                    $result[$mainKey] = [];
+                }
+                $result[$mainKey][] = $value;
+            }
+        }
+
+        return $result;
     }
 }

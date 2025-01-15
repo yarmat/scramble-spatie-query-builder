@@ -16,8 +16,6 @@ class AllowedFiltersExtension extends OperationExtension
 
     const MethodName = 'allowedFilters';
 
-    public array $examples = ['[name]=john', '[email]=gmail'];
-
     public string $configKey = 'query-builder.parameters.filter';
 
     public function handle(Operation $operation, RouteInfo $routeInfo)
@@ -32,18 +30,19 @@ class AllowedFiltersExtension extends OperationExtension
 
         $values = $helper->inferValues($methodCall, $routeInfo);
 
-        $parameter = new Parameter(config($this->configKey), 'query');
-
-        $objectType = new ObjectType;
         foreach ($values as $value) {
-            $objectType->addProperty($value, new StringType);
-        }
-        $parameter->setSchema(Schema::fromType($objectType))
-            ->example($this->examples);
+            $parameter = new Parameter(config($this->configKey) . "[$value]", 'query');
 
-        $halt = $this->runHooks($operation, $parameter);
-        if (! $halt) {
-            $operation->addParameters([$parameter]);
+            $parameter->setSchema(Schema::fromType(new StringType()))
+                ->description('The '.$value.' to filter an item by. Multiple values can be passed, separated via , (`Nike,Tesla`).');
+
+            $halt = $this->runHooks($operation, $parameter);
+
+            if (! $halt) {
+                $operation->addParameters([
+                    $parameter,
+                ]);
+            }
         }
     }
 }

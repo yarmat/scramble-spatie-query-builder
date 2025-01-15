@@ -17,8 +17,6 @@ class AllowedIncludesExtension extends OperationExtension
 
     const MethodName = 'allowedIncludes';
 
-    public array $examples = ['posts', 'posts.comments', 'books'];
-
     public string $configKey = 'query-builder.parameters.include';
 
     public function handle(Operation $operation, RouteInfo $routeInfo)
@@ -32,15 +30,22 @@ class AllowedIncludesExtension extends OperationExtension
         }
 
         $values = $helper->inferValues($methodCall, $routeInfo);
-        $arrayType = new ArrayType;
-        $arrayType->items->enum($values);
+
+        $allowedIncludes = [];
+
+        foreach ($values as $value) {
+            $allowedIncludes[] = $value;
+            $allowedIncludes[] = $value . config('query-builder.count_suffix');
+            $allowedIncludes[] = $value . config('query-builder.exists_suffix');
+        }
 
         $parameter = new Parameter(config($this->configKey), 'query');
 
-        $parameter->setSchema(Schema::fromType((new AnyOf)->setItems([
-            $arrayType,
-            new StringType,
-        ])))->example($this->examples);
+        $parameter->setSchema(Schema::fromType(new StringType()))
+            ->description('Allowed includes: '
+                . implode(', ', array_map(fn($value) => '`' . $value . '`', $allowedIncludes))
+                . '. You can include multiple options by separating them with a comma.'
+            );
 
         $halt = $this->runHooks($operation, $parameter);
         if (! $halt) {
